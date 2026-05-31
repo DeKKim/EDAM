@@ -76,13 +76,6 @@ Censys is included to improve passive discovery, especially through certificate-
 
 GreyHatWarfare was included to extend the project beyond classical host discovery into cloud asset exposure and possible shadow IT. This supports one of the more current ASM concerns: public buckets and storage-related exposure.
 
-### Why Hunter.io Was Not Included
-
-Hunter.io is useful for email and contact intelligence, but that moves the project toward contact enumeration rather than infrastructure-centric attack surface mapping. For EDAM's scope, it is adjacent but not essential.
-
-### Why Maltego Was Not Integrated
-
-Maltego is strong for analyst-centric link analysis and investigation workflows, but it is not simply a graph library. Because EDAM already implements its own asset graph and visualization layer, Maltego is better treated as a conceptual comparison point rather than a direct dependency.
 
 ## System Overview
 
