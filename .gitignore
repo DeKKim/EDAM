@@ -1,6 +1,5 @@
 # Node
 node_modules/
-dist/
 dist-ssr/
 *.local
 
@@ -20,6 +19,7 @@ yarn-error.log*
 *.swo
 
 # Project-specific
+.codex
 diag.mjs
 diag-google.mjs
 test-scan.mjs

@@ -53,8 +53,6 @@ async function fetchTextViaCorsProxy(url: string, timeout = 20000): Promise<stri
   throw lastErr ?? new Error('CORS proxy failed');
 }
 
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-
 function normalizeHostname(raw: string): string | null {
   const n = raw.trim().toLowerCase().replace(/\.$/, '').replace(/^\*\./, '');
   if (!n) return null;
@@ -83,6 +81,9 @@ export async function discoverSubdomainsCrtSh(domain: string): Promise<string[]>
   }
   return Array.from(subs);
 }
+
+// Backward-compatible alias for older orchestrator naming.
+export const discoverSubdomainsCT = discoverSubdomainsCrtSh;
 
 /* ── 1b. HackerTarget ── */
 
@@ -201,15 +202,14 @@ export async function resolveDns(
   hostname: string,
   types: string[] = ['A', 'AAAA', 'CNAME']
 ): Promise<DnsRecord[]> {
-  const records: DnsRecord[] = [];
-
-  for (const t of types) {
+  const results = await Promise.all(types.map(async (t) => {
     try {
       const url = `https://dns.google/resolve?name=${encodeURIComponent(
         hostname
       )}&type=${t}`;
-      const data = await fetchJson<GoogleDnsResponse>(url, 8000);
+      const data = await fetchJson<GoogleDnsResponse>(url, 4500);
 
+      const records: DnsRecord[] = [];
       if (data.Answer) {
         for (const ans of data.Answer) {
           records.push({
@@ -219,24 +219,30 @@ export async function resolveDns(
           });
         }
       }
+      return records;
     } catch {
-      // skip failed type
+      return [];
     }
-    await delay(100);
-  }
+  }));
 
-  return records;
+  return results.flat();
 }
 
 /* ── 3. Shodan API ── */
 
 const PORT_NAMES: Record<number, string> = {
-  21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
-  80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS', 445: 'SMB',
-  993: 'IMAPS', 995: 'POP3S', 1433: 'MSSQL', 1521: 'Oracle',
-  3306: 'MySQL', 3389: 'RDP', 5432: 'PostgreSQL', 5900: 'VNC',
-  6379: 'Redis', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt',
-  27017: 'MongoDB', 9200: 'Elasticsearch', 11211: 'Memcached',
+  21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS', 69: 'TFTP',
+  80: 'HTTP', 81: 'HTTP-Alt', 88: 'Kerberos', 110: 'POP3', 111: 'RPCBind',
+  135: 'MSRPC', 137: 'NetBIOS', 138: 'NetBIOS', 139: 'NetBIOS', 143: 'IMAP',
+  161: 'SNMP', 389: 'LDAP', 443: 'HTTPS', 445: 'SMB', 465: 'SMTPS',
+  514: 'Syslog', 515: 'LPD', 548: 'AFP', 587: 'Submission', 631: 'IPP',
+  636: 'LDAPS', 993: 'IMAPS', 995: 'POP3S', 1080: 'SOCKS', 1433: 'MSSQL',
+  1521: 'Oracle', 2049: 'NFS', 3128: 'Squid', 3306: 'MySQL', 3389: 'RDP',
+  4000: 'Teradata', 5000: 'Flask/UPnP', 5432: 'PostgreSQL', 5900: 'VNC',
+  5901: 'VNC-1', 5984: 'CouchDB', 6379: 'Redis', 7001: 'WebLogic',
+  8000: 'HTTP-Alt', 8008: 'HTTP-Alt', 8080: 'HTTP-Alt', 8081: 'HTTP-Alt',
+  8443: 'HTTPS-Alt', 8888: 'HTTP-Alt', 9000: 'SonarQube', 9200: 'Elasticsearch',
+  9929: 'Nping-Echo', 11211: 'Memcached', 27017: 'MongoDB', 31337: 'Elite/Tcpwrapped'
 };
 
 interface ShodanHostResponse {
@@ -300,7 +306,78 @@ export async function shodanLookup(
   }
 }
 
-// No explicit validation helper here; the frontend simply checks for presence of a key.
+/* ── 3b. Censys Search API (Subdomain Discovery) ── */
+
+interface CensysSearchResponse {
+  result?: {
+    hits?: Array<{
+      names?: string[];
+    }>;
+  };
+}
+
+export async function discoverSubdomainsCensys(
+  domain: string,
+  apiId: string,
+  apiSecret: string
+): Promise<string[]> {
+  if (!apiId || !apiSecret) return [];
+
+  // Censys requires Basic Auth: b64(id:secret)
+  const auth = btoa(`${apiId}:${apiSecret}`);
+  const url = `https://search.censys.io/api/v2/hosts/search?q=services.tls.certificates.leaf_data.names:${domain}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Basic ${auth}` },
+      signal: withTimeout(20000),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as CensysSearchResponse;
+
+    const subs = new Set<string>();
+    for (const hit of data.result?.hits || []) {
+      for (const raw of hit.names || []) {
+        const n = normalizeHostname(raw);
+        if (n && n.endsWith(domain)) subs.add(n);
+      }
+    }
+    return Array.from(subs);
+  } catch {
+    return [];
+  }
+}
+
+/* ── 3c. GreyHatWarfare (Cloud Bucket Discovery) ── */
+
+interface GreyHatResponse {
+  buckets?: Array<{
+    id: number;
+    name: string;
+    type: string;
+    provider: string;
+  }>;
+}
+
+export async function discoverBucketsGreyHat(
+  domain: string,
+  apiKey: string
+): Promise<string[]> {
+  if (!apiKey) return [];
+
+  const url = `https://v1.greyhatwarfare.com/api/v1/buckets/search?keywords=${domain}&key=${apiKey}`;
+
+  try {
+    const data = await fetchJson<GreyHatResponse>(url, 15000);
+    const buckets = new Set<string>();
+    for (const b of data.buckets || []) {
+      buckets.add(`${b.name}.${b.provider}.com`); // e.g., backup-corp.s3.com
+    }
+    return Array.from(buckets);
+  } catch {
+    return [];
+  }
+}
 
 /* ── 4. HTTP/HTTPS Probing ── */
 
@@ -313,7 +390,7 @@ export async function probeHttp(hostname: string): Promise<{
       const res = await fetch(`${proto}://${hostname}`, {
         method: 'HEAD',
         mode: 'no-cors',
-        signal: withTimeout(5000),
+        signal: withTimeout(2500),
       });
       // no-cors gives opaque response, status 0 means it connected
       return res.type === 'opaque' || res.ok;

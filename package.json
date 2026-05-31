@@ -4,8 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "npm run dev",
     "dev": "concurrently -k \"vite\" \"npm run server\"",
     "server": "node server/server.mjs",
+    "presentation": "node server/presentation.mjs",
+    "presentation:build": "vite build",
     "build": "vite build",
     "preview": "vite preview"
   },

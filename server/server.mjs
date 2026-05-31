@@ -25,17 +25,33 @@ function checkTcpPort(ip, port, timeoutMs) {
     const finish = (open) => {
       if (done) return;
       done = true;
-      try { socket.destroy(); } catch {}
+      socket.unref();
+      socket.destroy();
       resolve(open);
     };
 
-    socket.setTimeout(timeoutMs);
-    socket.once('connect', () => finish(true));
-    socket.once('timeout', () => finish(false));
-    socket.once('error', () => finish(false));
+    // Use a hard timer for connection timeout in addition to socket.setTimeout
+    const connTimer = setTimeout(() => finish(false), timeoutMs);
 
-    // IPv6 needs host to be literal; net.connect handles both.
-    socket.connect(port, ip);
+    socket.once('connect', () => {
+      clearTimeout(connTimer);
+      finish(true);
+    });
+    socket.once('timeout', () => {
+      clearTimeout(connTimer);
+      finish(false);
+    });
+    socket.once('error', () => {
+      clearTimeout(connTimer);
+      finish(false);
+    });
+
+    try {
+      socket.connect(port, ip);
+    } catch (err) {
+      clearTimeout(connTimer);
+      finish(false);
+    }
   });
 }
 
@@ -51,7 +67,14 @@ async function runWithConcurrency(items, limit, worker) {
     }
   }
 
-  const workers = Array.from({ length: Math.max(1, limit) }, () => runner());
+  // Stagger worker starts to avoid massive connection bursts that trigger firewalls
+  const workers = Array.from({ length: Math.max(1, limit) }, (_, i) => {
+    return (async () => {
+      await new Promise((r) => setTimeout(r, i * 15));
+      return runner();
+    })();
+  });
+
   await Promise.all(workers);
   return results;
 }
@@ -64,13 +87,13 @@ app.post('/api/port-scan', async (req, res) => {
   const {
     ips = [],
     ports = [],
-    timeoutMs = 800,
-    concurrency = 120,
+    timeoutMs = 2000,
+    concurrency = 250,
   } = req.body || {};
 
   const ipList = Array.isArray(ips) ? ips.filter(isValidIp).slice(0, 200) : [];
   const portList = Array.isArray(ports)
-    ? ports.map((p) => Number(p)).filter(isValidPort).slice(0, 200)
+    ? ports.map((p) => Number(p)).filter(isValidPort)
     : [];
 
   if (ipList.length === 0 || portList.length === 0) {

@@ -1,8 +1,8 @@
 /* ── Core Asset Types ── */
 
-export type AssetType = 'domain' | 'subdomain' | 'ip' | 'service';
+export type AssetType = 'domain' | 'subdomain' | 'ip' | 'service' | 'bucket';
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
-export type RelationType = 'resolves_to' | 'exposes' | 'cname_to' | 'parent_of';
+export type RelationType = 'resolves_to' | 'exposes' | 'cname_to' | 'parent_of' | 'discovered_bucket';
 
 export interface BaseAsset {
   id: string;
@@ -39,10 +39,15 @@ export interface ServiceMetadata {
   banner?: string;
 }
 
+export interface BucketMetadata {
+  provider?: string;
+}
+
 export type Metadata =
   | DomainMetadata
   | IpMetadata
   | ServiceMetadata
+  | BucketMetadata
   | Record<string, string | number | boolean | string[]>;
 
 export interface DomainAsset extends BaseAsset {
@@ -60,7 +65,12 @@ export interface ServiceAsset extends BaseAsset {
   metadata: ServiceMetadata;
 }
 
-export type Asset = DomainAsset | IpAsset | ServiceAsset;
+export interface BucketAsset extends BaseAsset {
+  type: 'bucket';
+  metadata: BucketMetadata;
+}
+
+export type Asset = DomainAsset | IpAsset | ServiceAsset | BucketAsset;
 
 export interface Relationship {
   id: string;
@@ -76,6 +86,7 @@ export interface ScanStats {
   subdomains: number;
   ips: number;
   services: number;
+  buckets: number;
   avgRisk: number;
   maxRisk: number;
   critical: number;
@@ -109,10 +120,16 @@ export interface GraphNode {
   data: {
     id: string;
     label: string;
+    shortLabel: string;
     type: AssetType;
     severity: Severity;
     riskScore: number;
     value: string;
+    tier: number;
+    size: number;
+    degree: number;
+    inbound: number;
+    outbound: number;
     reasons: string[];
     meta: Metadata;
   };
@@ -124,6 +141,7 @@ export interface GraphEdge {
     source: string;
     target: string;
     label: string;
+    relationType: RelationType;
   };
 }
 
@@ -162,9 +180,17 @@ export interface ShodanHostResult {
 export interface ScanConfig {
   domain: string;
   shodanKey: string;
+  censysId?: string;
+  censysSecret?: string;
+  greyhatKey?: string;
   enableCT: boolean;
   enableShodan: boolean;
+  enableCensys?: boolean;
+  enableGreyHat?: boolean;
   enableActivePortScan?: boolean;
+  deepScan?: boolean;
+  maxSubdomains?: number;
+  shodanLimit?: number;
   activePortScanPorts?: number[];
   onProgress: (phase: string, pct: number, detail: string) => void;
   onLog: (msg: string) => void;
