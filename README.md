@@ -168,10 +168,11 @@ This section lists the project stack and every external source or API currently 
 - Shodan host and service enrichment
 - Local active TCP port checking
 - Heuristic risk scoring
-- Interactive Cytoscape-based asset graph
+- Interactive Cytoscape-based asset graph with two layouts (hierarchy and IP map)
 - Risk table with filtering and sorting
 - Local scan history with scan comparison
 - CSV, JSON, and Markdown export
+- Automated unit test suite for the scoring, graph, diffing, and export logic
 
 ## Asset and Relationship Model
 
@@ -190,7 +191,6 @@ EDAM represents the attack surface as a graph.
 - `parent_of`
 - `resolves_to`
 - `exposes`
-- `cname_to`
 - `discovered_bucket`
 
 This model allows the project to show how a root domain expands into child names, infrastructure endpoints, and exposed services.
@@ -340,8 +340,6 @@ The graph view is designed as an analyst-facing relationship map and includes:
 - mapping summary overlay for presentation-friendly explanation
 - faster wheel zoom with dedicated zoom-in, zoom-out, and fit controls
 
-Force-directed, risk-ring, and orbit layouts were removed to keep the mapping view simpler and easier to explain during presentation.
-
 ### Risk Table
 
 The risk table offers a triage-oriented textual view of discovered assets and supports filtering and sorting. It includes actionable counts, exposed endpoint counts, high-risk totals, finding categories, exposure summaries, primary evidence, and recommended follow-up checks.
@@ -391,7 +389,7 @@ A typical case study can examine:
 - overall heuristic risk distribution
 - changes across multiple scans over time
 
-For richer demonstration results, larger public organizations such as `microsoft.com`, `cloudflare.com`, or `tesla.com` are more informative than minimal demo targets like `scanme.nmap.org`.
+For demonstrations, use an owned lab domain, an explicitly authorized target, or a public test target that clearly allows scanning. Do not use third-party organizations as demo targets unless you have permission.
 
 ## Limitations
 
@@ -405,8 +403,6 @@ EDAM has several intentional limitations:
 - active TCP checks only validate connect success, not protocol correctness or exploitability
 - heuristic scores are useful for triage, but not a substitute for manual analysis
 - large result sets are capped for performance and UI clarity
-
-There is also an existing connector naming compatibility workaround in the scan orchestrator related to historical `discoverSubdomainsCT` naming.
 
 ## Future Work
 
@@ -446,10 +442,30 @@ Possible future improvements include:
 │   ├── App.tsx
 │   ├── index.css
 │   └── main.tsx
+├── test/
+│   ├── changeDetection.test.mjs
+│   ├── exportUtils.test.mjs
+│   ├── graphBuilder.test.mjs
+│   └── riskEngine.test.mjs
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── PRESENTATION_BRIEF.md
+│   └── USER_GUIDE.md
 ├── test-api-connectors.mjs
+├── CONTRIBUTING.md
+├── .env.local.example
+├── LICENSE
 ├── package.json
 └── vite.config.ts
 ```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — component, sequence, and deployment diagrams; data model; design decisions
+- [Presentation Brief](docs/PRESENTATION_BRIEF.md) — slide-ready talking points and demo structure
+- [User Guide](docs/USER_GUIDE.md) — step-by-step walkthrough of every view
+- [Contributing](CONTRIBUTING.md) — setup, project layout, conventions, and checks
+- [License](LICENSE) — MIT
 
 ## Setup and Running
 
@@ -548,6 +564,32 @@ npm run build
 npm run preview
 ```
 
+### Run Tests
+
+```bash
+npm test
+```
+
+The pure logic in `src/engine/` (risk scoring, graph building, scan diffing, and
+export) is covered by unit tests under `test/`, run with
+Node.js's built-in test runner — no extra dependencies. Type-check the whole
+project with:
+
+```bash
+npx tsc --noEmit
+```
+
+## Troubleshooting
+
+| Symptom | Likely cause and fix |
+|---------|----------------------|
+| Passive discovery returns few/no subdomains | Public OSINT sources or CORS proxies are rate-limited or temporarily down. Retry, or run a different target; sources fail soft and the scan still completes. |
+| "Shodan/Censys/GreyHatWarfare skipped" in the log | No API key configured. Add the key(s) to `.env` (see `.env.local.example`). All keys are optional. |
+| Active port check fails / "Backend unreachable" | The local backend isn't running. Use `npm start` (starts both), and confirm `http://localhost:8787/api/health` returns `{ "ok": true }`. |
+| HTTP probe shows `false` for sites that load in a browser | Probing uses `no-cors` HEAD requests and only confirms reachability; some hosts block it. This is expected and noted in the limitations. |
+| `npm run build` fails with a `@rollup/rollup-*` "Cannot find module" error | Platform-specific optional dependency mismatch (e.g. copying `node_modules` between OSes). Delete `node_modules` and `package-lock.json`, then `npm install` on the target machine. |
+| Presentation mode shows "Missing dist/index.html" | You must run `npm run build` once before using presentation mode. |
+
 ## Local Backend API
 
 ### `GET /api/health`
@@ -580,6 +622,19 @@ Example response:
   }
 }
 ```
+
+### Status and error codes
+
+| Endpoint | Status | Meaning |
+|----------|--------|---------|
+| `GET /api/health` | `200` | Backend is up — `{ "ok": true }` |
+| `POST /api/port-scan` | `200` | Scan completed; body contains `openByIp` |
+| `POST /api/port-scan` | `400` | Missing/invalid input — `{ "error": "ips and ports are required" }` |
+| unsupported method or path | `405` | Method not allowed (presentation server) |
+
+Request fields are validated and clamped on the server: IPs must be valid IPv4/IPv6
+literals (max 200 per request), ports must be `1–65535`, `timeoutMs` is clamped to
+`150–5000`, and `concurrency` to `1–400`.
 
 ## Ethics and Legal Use
 

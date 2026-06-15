@@ -10,7 +10,8 @@
     "presentation": "node server/presentation.mjs",
     "presentation:build": "vite build",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "clsx": "^2.1.1",

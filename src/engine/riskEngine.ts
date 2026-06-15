@@ -40,41 +40,53 @@ const DATABASE_PORTS = new Set([1433, 1521, 3306, 5432, 6379, 9200, 11211, 27017
 const WINDOWS_EXPOSURE_PORTS = new Set([135, 139, 445]);
 
 /* ── Subdomain Name Risk Patterns ── */
-const NAME_RISKS: Array<{ pattern: RegExp; score: number; reason: string }> = [
-  { pattern: /dev/i,           score: 4, reason: 'Subdomain contains "dev" — likely development environment' },
-  { pattern: /test/i,          score: 4, reason: 'Subdomain contains "test" — likely test environment' },
-  { pattern: /stag/i,          score: 4, reason: 'Subdomain contains "stag" — likely staging environment' },
-  { pattern: /admin/i,         score: 4, reason: 'Subdomain contains "admin" — administrative interface' },
-  { pattern: /api/i,           score: 3, reason: 'Subdomain contains "api" — API endpoint' },
-  { pattern: /vpn/i,           score: 4, reason: 'Subdomain contains "vpn" — VPN gateway' },
-  { pattern: /mail/i,          score: 3, reason: 'Subdomain contains "mail" — email service' },
-  { pattern: /ftp/i,           score: 5, reason: 'Subdomain contains "ftp" — file transfer service' },
-  { pattern: /db/i,            score: 5, reason: 'Subdomain contains "db" — possible database access' },
-  { pattern: /debug/i,         score: 6, reason: 'Subdomain contains "debug" — debug interface exposed' },
-  { pattern: /backup/i,        score: 5, reason: 'Subdomain contains "backup" — backup system' },
-  { pattern: /jira/i,          score: 3, reason: 'Subdomain contains "jira" — project tracker' },
-  { pattern: /jenkins/i,       score: 5, reason: 'Subdomain contains "jenkins" — CI/CD pipeline' },
-  { pattern: /git/i,           score: 4, reason: 'Subdomain contains "git" — version control' },
-  { pattern: /phpmyadmin/i,    score: 6, reason: 'Subdomain contains "phpmyadmin" — database manager' },
-  { pattern: /internal/i,      score: 5, reason: 'Subdomain contains "internal" — internal service exposed' },
-  { pattern: /old/i,           score: 3, reason: 'Subdomain contains "old" — potentially unmaintained' },
-  { pattern: /legacy/i,        score: 4, reason: 'Subdomain contains "legacy" — legacy system' },
-  { pattern: /uat/i,           score: 4, reason: 'Subdomain contains "uat" — user acceptance testing environment' },
-  { pattern: /qa/i,            score: 4, reason: 'Subdomain contains "qa" — quality assurance environment' },
-  { pattern: /demo/i,          score: 3, reason: 'Subdomain contains "demo" — demonstration environment' },
-  { pattern: /beta/i,          score: 3, reason: 'Subdomain contains "beta" — pre-production service' },
-  { pattern: /preview/i,       score: 3, reason: 'Subdomain contains "preview" — pre-release service' },
-  { pattern: /portal/i,        score: 3, reason: 'Subdomain contains "portal" — user or admin portal' },
-  { pattern: /sso/i,           score: 4, reason: 'Subdomain contains "sso" — identity service' },
-  { pattern: /auth/i,          score: 4, reason: 'Subdomain contains "auth" — authentication service' },
-  { pattern: /login/i,         score: 4, reason: 'Subdomain contains "login" — authentication endpoint' },
-  { pattern: /grafana/i,       score: 5, reason: 'Subdomain contains "grafana" — monitoring dashboard' },
-  { pattern: /kibana/i,        score: 5, reason: 'Subdomain contains "kibana" — log analytics dashboard' },
-  { pattern: /prometheus/i,    score: 5, reason: 'Subdomain contains "prometheus" — monitoring endpoint' },
-  { pattern: /sonar/i,         score: 4, reason: 'Subdomain contains "sonar" — code quality or scanner portal' },
-  { pattern: /nexus/i,         score: 5, reason: 'Subdomain contains "nexus" — artifact repository' },
-  { pattern: /artifactory/i,   score: 5, reason: 'Subdomain contains "artifactory" — artifact repository' },
+const NAME_RISKS: Array<{ keyword: string; score: number; reason: string }> = [
+  { keyword: 'dev',         score: 4, reason: 'Subdomain contains "dev" — likely development environment' },
+  { keyword: 'test',        score: 4, reason: 'Subdomain contains "test" — likely test environment' },
+  { keyword: 'stag',        score: 4, reason: 'Subdomain contains "stag" — likely staging environment' },
+  { keyword: 'admin',       score: 4, reason: 'Subdomain contains "admin" — administrative interface' },
+  { keyword: 'api',         score: 3, reason: 'Subdomain contains "api" — API endpoint' },
+  { keyword: 'vpn',         score: 4, reason: 'Subdomain contains "vpn" — VPN gateway' },
+  { keyword: 'mail',        score: 3, reason: 'Subdomain contains "mail" — email service' },
+  { keyword: 'ftp',         score: 5, reason: 'Subdomain contains "ftp" — file transfer service' },
+  { keyword: 'db',          score: 5, reason: 'Subdomain contains "db" — possible database access' },
+  { keyword: 'debug',       score: 6, reason: 'Subdomain contains "debug" — debug interface exposed' },
+  { keyword: 'backup',      score: 5, reason: 'Subdomain contains "backup" — backup system' },
+  { keyword: 'jira',        score: 3, reason: 'Subdomain contains "jira" — project tracker' },
+  { keyword: 'jenkins',     score: 5, reason: 'Subdomain contains "jenkins" — CI/CD pipeline' },
+  { keyword: 'git',         score: 4, reason: 'Subdomain contains "git" — version control' },
+  { keyword: 'phpmyadmin',  score: 6, reason: 'Subdomain contains "phpmyadmin" — database manager' },
+  { keyword: 'internal',    score: 5, reason: 'Subdomain contains "internal" — internal service exposed' },
+  { keyword: 'old',         score: 3, reason: 'Subdomain contains "old" — potentially unmaintained' },
+  { keyword: 'legacy',      score: 4, reason: 'Subdomain contains "legacy" — legacy system' },
+  { keyword: 'uat',         score: 4, reason: 'Subdomain contains "uat" — user acceptance testing environment' },
+  { keyword: 'qa',          score: 4, reason: 'Subdomain contains "qa" — quality assurance environment' },
+  { keyword: 'demo',        score: 3, reason: 'Subdomain contains "demo" — demonstration environment' },
+  { keyword: 'beta',        score: 3, reason: 'Subdomain contains "beta" — pre-production service' },
+  { keyword: 'preview',     score: 3, reason: 'Subdomain contains "preview" — pre-release service' },
+  { keyword: 'portal',      score: 3, reason: 'Subdomain contains "portal" — user or admin portal' },
+  { keyword: 'sso',         score: 4, reason: 'Subdomain contains "sso" — identity service' },
+  { keyword: 'auth',        score: 4, reason: 'Subdomain contains "auth" — authentication service' },
+  { keyword: 'login',       score: 4, reason: 'Subdomain contains "login" — authentication endpoint' },
+  { keyword: 'grafana',     score: 5, reason: 'Subdomain contains "grafana" — monitoring dashboard' },
+  { keyword: 'kibana',      score: 5, reason: 'Subdomain contains "kibana" — log analytics dashboard' },
+  { keyword: 'prometheus',  score: 5, reason: 'Subdomain contains "prometheus" — monitoring endpoint' },
+  { keyword: 'sonar',       score: 4, reason: 'Subdomain contains "sonar" — code quality or scanner portal' },
+  { keyword: 'nexus',       score: 5, reason: 'Subdomain contains "nexus" — artifact repository' },
+  { keyword: 'artifactory', score: 5, reason: 'Subdomain contains "artifactory" — artifact repository' },
 ];
+
+/**
+ * Matches a keyword against a hostname at label boundaries instead of as a
+ * free substring. The keyword must begin a dot-separated label or follow a
+ * non-letter character (hyphen, underscore, digit). This keeps intended
+ * matches like "dev"→"developer" or "api"→"api-gw" while avoiding false
+ * positives such as "git" inside "digital" or "old" inside "gold".
+ */
+function hostnameHasKeyword(hostname: string, keyword: string): boolean {
+  const re = new RegExp(`(^|[^a-z])${keyword}`, 'i');
+  return hostname.toLowerCase().split('.').some(label => re.test(label));
+}
 
 /* ── Scoring Function ── */
 
@@ -94,7 +106,7 @@ export function scoreAsset(
   // ── Subdomain / Domain name analysis
   if (asset.type === 'subdomain' || asset.type === 'domain') {
     for (const rule of NAME_RISKS) {
-      if (rule.pattern.test(asset.value)) {
+      if (hostnameHasKeyword(asset.value, rule.keyword)) {
         score += rule.score;
         reasons.push(rule.reason);
       }

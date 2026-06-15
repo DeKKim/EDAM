@@ -55,6 +55,21 @@ const RELATION_COLORS: Record<RelationType, string> = {
   discovered_bucket: '#f59e0b',
 };
 
+/** Mirrors the geometric shapes Cytoscape draws per asset type, for the graph legend. */
+function NodeShape({ type, className = 'h-4 w-4' }: { type: AssetType; className?: string }) {
+  const props = { fill: '#0f172a', stroke: '#94a3b8', strokeWidth: 1.6 };
+  const shape = (() => {
+    switch (type) {
+      case 'domain': return <polygon points="10,2 18,10 10,18 2,10" {...props} />;
+      case 'subdomain': return <rect x="2.5" y="5" width="15" height="10" rx="3" {...props} />;
+      case 'ip': return <circle cx="10" cy="10" r="7.5" {...props} />;
+      case 'service': return <polygon points="6,3 14,3 18.5,10 14,17 6,17 1.5,10" {...props} />;
+      case 'bucket': return <polygon points="10,3 18,17 2,17" {...props} />;
+    }
+  })();
+  return <svg viewBox="0 0 20 20" className={className}>{shape}</svg>;
+}
+
 function Badge({ severity }: { severity: Severity }) {
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white ${SEV_COLORS[severity]}`}>
@@ -205,78 +220,94 @@ function buildMappingSummary(scan: ScanResult, exposurePaths: ExposurePath[], hu
 
 function buildInfrastructurePositions(assets: Asset[], relationships: { sourceId: string; targetId: string }[]) {
   const assetById = new Map(assets.map(asset => [asset.id, asset]));
-  const byType = {
-    domain: assets.filter(asset => asset.type === 'domain'),
-    subdomain: assets.filter(asset => asset.type === 'subdomain'),
-    ip: assets.filter(asset => asset.type === 'ip'),
-    service: assets.filter(asset => asset.type === 'service'),
-    bucket: assets.filter(asset => asset.type === 'bucket'),
+  const byType: Record<AssetType, Asset[]> = {
+    domain: [], subdomain: [], ip: [], service: [], bucket: [],
   };
+  for (const asset of assets) byType[asset.type].push(asset);
 
-  const linkedIpByName = new Map<string, string>();
-  const linkCountByAsset = new Map<string, number>();
+  // Map each name/service to the IP it hangs off, so we can align them in rows.
+  const ipByName = new Map<string, string>();
+  const ipByService = new Map<string, string>();
+  const linkCount = new Map<string, number>();
   for (const rel of relationships) {
-    linkCountByAsset.set(rel.sourceId, (linkCountByAsset.get(rel.sourceId) || 0) + 1);
-    linkCountByAsset.set(rel.targetId, (linkCountByAsset.get(rel.targetId) || 0) + 1);
+    linkCount.set(rel.sourceId, (linkCount.get(rel.sourceId) || 0) + 1);
+    linkCount.set(rel.targetId, (linkCount.get(rel.targetId) || 0) + 1);
 
     const source = assetById.get(rel.sourceId);
     const target = assetById.get(rel.targetId);
     if (!source || !target) continue;
 
-    if ((source.type === 'domain' || source.type === 'subdomain') && target.type === 'ip') {
-      linkedIpByName.set(source.id, target.id);
-    }
-    if (source.type === 'ip' && (target.type === 'domain' || target.type === 'subdomain')) {
-      linkedIpByName.set(target.id, source.id);
-    }
+    if ((source.type === 'domain' || source.type === 'subdomain') && target.type === 'ip') ipByName.set(source.id, target.id);
+    if (source.type === 'ip' && (target.type === 'domain' || target.type === 'subdomain')) ipByName.set(target.id, source.id);
+    if (source.type === 'ip' && target.type === 'service') ipByService.set(target.id, source.id);
+    if (source.type === 'service' && target.type === 'ip') ipByService.set(source.id, target.id);
   }
 
-  const sortedIps = [...byType.ip].sort((a, b) => {
-    const aLinks = linkCountByAsset.get(a.id) || 0;
-    const bLinks = linkCountByAsset.get(b.id) || 0;
-    return bLinks - aLinks || b.riskScore - a.riskScore;
-  });
+  // Busiest / riskiest IP anchors first so the densest part of the map sits in the middle.
+  const sortedIps = [...byType.ip].sort((a, b) =>
+    (linkCount.get(b.id) || 0) - (linkCount.get(a.id) || 0) || b.riskScore - a.riskScore
+  );
 
-  const positions: Record<string, { x: number; y: number }> = {};
-  const yStep = 92;
-  const center = 0;
-
-  const placeColumn = (items: Asset[], x: number, startY = center) => {
-    const offset = ((items.length - 1) * yStep) / 2;
-    items.forEach((asset, index) => {
-      positions[asset.id] = { x, y: startY + index * yStep - offset };
-    });
+  const groupBy = (items: Asset[], lookup: Map<string, string>) => {
+    const grouped = new Map<string, Asset[]>();
+    const loose: Asset[] = [];
+    for (const item of items) {
+      const ipId = lookup.get(item.id);
+      if (!ipId) { loose.push(item); continue; }
+      if (!grouped.has(ipId)) grouped.set(ipId, []);
+      grouped.get(ipId)!.push(item);
+    }
+    return { grouped, loose };
   };
 
-  placeColumn(byType.domain, -520);
-  placeColumn(sortedIps, 40);
-  placeColumn(byType.service, 520);
-  placeColumn(byType.bucket, 260, Math.max(260, sortedIps.length * 28));
+  const { grouped: namesByIp, loose: looseNames } = groupBy(byType.subdomain, ipByName);
+  const { grouped: svcByIp, loose: looseServices } = groupBy(byType.service, ipByService);
 
-  const subdomainsByIp = new Map<string, Asset[]>();
-  const unlinkedSubdomains: Asset[] = [];
-  for (const asset of byType.subdomain) {
-    const ipId = linkedIpByName.get(asset.id);
-    if (!ipId) {
-      unlinkedSubdomains.push(asset);
-      continue;
-    }
-    if (!subdomainsByIp.has(ipId)) subdomainsByIp.set(ipId, []);
-    subdomainsByIp.get(ipId)!.push(asset);
+  const positions: Record<string, { x: number; y: number }> = {};
+  const domainX = -620, bucketX = -430, nameX = -240, ipX = 150, svcX = 540;
+  const rowStep = 46, blockGap = 42;
+
+  // Give every IP a vertical block tall enough for the larger of its name / service column,
+  // then stack the blocks so no rows overlap.
+  let cursor = 0;
+  const blocks = sortedIps.map(ip => {
+    const names = namesByIp.get(ip.id) || [];
+    const services = svcByIp.get(ip.id) || [];
+    const rows = Math.max(names.length, services.length, 1);
+    const height = rows * rowStep;
+    const block = { ip, names, services, top: cursor, height };
+    cursor += height + blockGap;
+    return block;
+  });
+  const shift = Math.max(0, cursor - blockGap) / 2;
+
+  const placeGroup = (items: Asset[], x: number, blockTop: number, blockHeight: number) => {
+    if (items.length === 0) return;
+    const groupHeight = (items.length - 1) * rowStep;
+    const start = blockTop + (blockHeight - groupHeight) / 2;
+    items.forEach((asset, index) => { positions[asset.id] = { x, y: start + index * rowStep }; });
+  };
+
+  for (const block of blocks) {
+    const top = block.top - shift;
+    positions[block.ip.id] = { x: ipX, y: top + block.height / 2 };
+    placeGroup(block.names, nameX, top, block.height);
+    placeGroup(block.services, svcX, top, block.height);
   }
 
-  for (const ip of sortedIps) {
-    const group = subdomainsByIp.get(ip.id) || [];
-    const ipPos = positions[ip.id] || { x: 40, y: 0 };
-    const offset = ((group.length - 1) * 52) / 2;
-    group.forEach((asset, index) => {
-      positions[asset.id] = { x: -230, y: ipPos.y + index * 52 - offset };
-    });
-  }
+  const placeColumn = (items: Asset[], x: number, startY: number) => {
+    const offset = ((items.length - 1) * 92) / 2;
+    items.forEach((asset, index) => { positions[asset.id] = { x, y: startY + index * 92 - offset }; });
+  };
 
-  if (unlinkedSubdomains.length > 0) {
-    placeColumn(unlinkedSubdomains, -230, Math.max(280, sortedIps.length * 42));
-  }
+  // Domain(s) and buckets sit on the left; buckets link straight to the domain.
+  placeColumn(byType.domain, domainX, 0);
+  placeColumn(byType.bucket, bucketX, 0);
+
+  // Names / services with no resolved IP go in a parking lane below the anchored blocks.
+  const parkY = shift + 120;
+  placeColumn(looseNames, nameX, parkY);
+  placeColumn(looseServices, svcX, parkY);
 
   return positions;
 }
@@ -1023,7 +1054,10 @@ function DashboardView({ scan }: { scan: ScanResult }) {
 function GraphView({ scan }: { scan: ScanResult }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
+  const viewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
+  const prevLayoutRef = useRef<GraphLayout | null>(null);
   const [selected, setSelected] = useState<Asset | null>(null);
+  const [pathIds, setPathIds] = useState<string[] | null>(null);
   const [typeFilters, setTypeFilters] = useState<Record<AssetType, boolean>>({
     domain: true, subdomain: true, ip: true, service: true, bucket: true,
   });
@@ -1110,37 +1144,46 @@ function GraphView({ scan }: { scan: ScanResult }) {
     });
   };
 
+  // Highlighting is driven by the effect below; these handlers set state and zoom the viewport.
   const focusAsset = (assetId: string) => {
     const asset = scan.assets.find(a => a.id === assetId) || null;
     setSelected(asset);
+    setPathIds(null);
 
     const cy = cyRef.current;
     if (!cy) return;
+    const node = cy.getElementById(assetId);
+    if (node.nonempty()) cy.animate({ fit: { eles: node.closedNeighborhood(), padding: 80 }, duration: 220 });
+  };
 
-    cy.batch(() => {
-      cy.elements().removeClass('faded related focused');
-      const node = cy.getElementById(assetId);
-      if (!node.nonempty()) return;
+  const focusPath = (assetIds: string[]) => {
+    const endpoint = scan.assets.find(a => a.id === assetIds[assetIds.length - 1]) || null;
+    setSelected(endpoint);
+    setPathIds(assetIds);
 
-      const neighborhood = node.closedNeighborhood();
-      cy.elements().not(neighborhood).addClass('faded');
-      neighborhood.addClass('related');
-      node.addClass('focused');
-      cy.animate({ fit: { eles: neighborhood, padding: 80 }, duration: 220 });
-    });
+    const cy = cyRef.current;
+    if (!cy) return;
+    let nodes = cy.collection();
+    for (const id of assetIds) {
+      const n = cy.getElementById(id);
+      if (n.nonempty()) nodes = nodes.union(n);
+    }
+    if (nodes.nonempty()) cy.animate({ fit: { eles: nodes, padding: 90 }, duration: 240 });
   };
 
   const clearFocus = () => {
     setSelected(null);
-    const cy = cyRef.current;
-    if (!cy) return;
-    cy.elements().removeClass('faded related focused');
+    setPathIds(null);
   };
 
   useEffect(() => {
+    if (cyRef.current) { cyRef.current.destroy(); cyRef.current = null; }
     if (!containerRef.current) return;
 
-    if (cyRef.current) cyRef.current.destroy();
+    // Preserve the user's zoom/pan across filter toggles (same layout); refit on layout change.
+    const savedViewport = viewportRef.current;
+    const layoutChanged = prevLayoutRef.current !== layout;
+    prevLayoutRef.current = layout;
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -1235,7 +1278,7 @@ function GraphView({ scan }: { scan: ScanResult }) {
             'target-arrow-color': '#475569',
             'target-arrow-shape': 'triangle',
             'curve-style': 'taxi',
-            'taxi-direction': 'downward',
+            'taxi-direction': layout === 'infrastructure' ? 'rightward' : 'downward',
             'taxi-turn': 28,
             opacity: 0.6,
           },
@@ -1290,9 +1333,9 @@ function GraphView({ scan }: { scan: ScanResult }) {
       ],
       layout: {
         name: layout === 'infrastructure' ? 'preset' : layout,
+        fit: false,
         ...(layout === 'infrastructure'
           ? {
-              fit: true,
               padding: 70,
             }
           : {}),
@@ -1305,72 +1348,86 @@ function GraphView({ scan }: { scan: ScanResult }) {
             }
           : {}),
       } as cytoscape.LayoutOptions,
-      minZoom: 0.2,
+      minZoom: 0.06,
       maxZoom: 6,
       wheelSensitivity: 0.55,
     });
-
-    const highlightNode = (assetId: string | null) => {
-      cy.batch(() => {
-        cy.elements().removeClass('faded related focused');
-        if (!assetId) return;
-
-        const node = cy.getElementById(assetId);
-        if (!node.nonempty()) return;
-
-        const neighborhood = node.closedNeighborhood();
-        cy.elements().not(neighborhood).addClass('faded');
-        neighborhood.addClass('related');
-        node.addClass('focused');
-      });
-    };
 
     cy.on('tap', 'node', (evt) => {
       const d = evt.target.data();
       const asset = scan.assets.find(a => a.id === d.id);
       if (asset) {
         setSelected(asset);
-        highlightNode(asset.id);
+        setPathIds(null);
       }
     });
 
     cy.on('tap', (evt) => {
       if (evt.target === cy) {
         setSelected(null);
-        highlightNode(null);
+        setPathIds(null);
       }
     });
 
+    // Pointer affordance on hover.
+    cy.on('mouseover', 'node', () => { if (containerRef.current) containerRef.current.style.cursor = 'pointer'; });
+    cy.on('mouseout', 'node', () => { if (containerRef.current) containerRef.current.style.cursor = 'default'; });
+
+    let viewportReady = false;
     cy.on('layoutstop', () => {
-      cy.fit(undefined, 50);
+      if (!layoutChanged && savedViewport) {
+        cy.zoom(savedViewport.zoom);
+        cy.pan(savedViewport.pan);
+      } else {
+        cy.fit(undefined, 50);
+      }
+      viewportReady = true;
+    });
+    cy.on('viewport', () => {
+      if (viewportReady) viewportRef.current = { zoom: cy.zoom(), pan: { ...cy.pan() } };
     });
 
     cyRef.current = cy;
 
-    return () => { cy.destroy(); };
+    return () => { cy.destroy(); if (cyRef.current === cy) cyRef.current = null; };
   }, [graph, filteredAssets, infrastructurePositions, layout, scan]);
 
   useEffect(() => {
-    if (!selectedStillVisible && selected) setSelected(null);
+    if (!selectedStillVisible && selected) { setSelected(null); setPathIds(null); }
   }, [selected, selectedStillVisible]);
 
+  // Single source of truth for fade/highlight: an exposure path if one is focused, else the selected node's neighborhood.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
 
     cy.batch(() => {
       cy.elements().removeClass('faded related focused');
-      if (!selectedStillVisible) return;
 
-      const node = cy.getElementById(selectedStillVisible.id);
-      if (!node.nonempty()) return;
+      if (pathIds && pathIds.length > 0) {
+        let nodes = cy.collection();
+        for (const id of pathIds) {
+          const n = cy.getElementById(id);
+          if (n.nonempty()) nodes = nodes.union(n);
+        }
+        if (nodes.empty()) return;
+        const eles = nodes.union(nodes.edgesWith(nodes));
+        cy.elements().not(eles).addClass('faded');
+        eles.addClass('related');
+        nodes.last().addClass('focused');
+        return;
+      }
 
-      const neighborhood = node.closedNeighborhood();
-      cy.elements().not(neighborhood).addClass('faded');
-      neighborhood.addClass('related');
-      node.addClass('focused');
+      if (selectedStillVisible) {
+        const node = cy.getElementById(selectedStillVisible.id);
+        if (!node.nonempty()) return;
+        const neighborhood = node.closedNeighborhood();
+        cy.elements().not(neighborhood).addClass('faded');
+        neighborhood.addClass('related');
+        node.addClass('focused');
+      }
     });
-  }, [selectedStillVisible]);
+  }, [selectedStillVisible, pathIds, graph]);
 
   const infoAsset = selectedStillVisible || topRiskAssets[0] || null;
 
@@ -1463,7 +1520,7 @@ function GraphView({ scan }: { scan: ScanResult }) {
             title="Zoom out"
           >
             -
-          </button>
+              </button>
           <button
             onClick={clearFocus}
             className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-800"
@@ -1593,7 +1650,7 @@ function GraphView({ scan }: { scan: ScanResult }) {
                     return (
                       <button
                         key={`${endpoint.id}-${index}`}
-                        onClick={() => focusAsset(endpoint.id)}
+                        onClick={() => focusPath(path.assets.map(asset => asset.id))}
                         className="w-full rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-left transition-colors hover:bg-slate-800/70"
                       >
                         <div className="mb-2 flex items-center justify-between gap-3">
@@ -1739,6 +1796,37 @@ function GraphView({ scan }: { scan: ScanResult }) {
                     );
                   })
                 )}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-slate-200">Map Legend</h3>
+              <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <div>
+                  <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Node Shapes</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                    {(['domain', 'subdomain', 'ip', 'service', 'bucket'] as AssetType[]).map(t => (
+                      <div key={t} className="flex items-center gap-2">
+                        <NodeShape type={t} className="h-4 w-4 flex-shrink-0" />
+                        <span className="capitalize">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Severity (node border)</div>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    {(['critical', 'high', 'medium', 'low'] as Severity[]).map(s => (
+                      <div key={s} className="flex items-center gap-1.5">
+                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: severityColor(s) }} />
+                        <span className={`${SEV_TEXT[s]} capitalize`}>{s}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs leading-5 text-slate-500">
+                  Node size grows with risk. Double-bordered nodes are shared-infrastructure hubs (4+ connections).
+                </p>
               </div>
             </section>
 
