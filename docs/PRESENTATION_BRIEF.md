@@ -53,7 +53,7 @@ prioritization* tool.
 ## 1.1 Code quality and architecture
 
 **Talking points**
-- **Full-stack TypeScript + React 18 + Vite 6**, styled with Tailwind CSS 4,
+- **Full-stack TypeScript + React 18 + Vite 8**, styled with Tailwind CSS 4,
   graph rendered with Cytoscape.js, icons with lucide-react.
 - **Clear layered architecture** with separation of concerns:
   - `src/api/connectors.ts` — one isolated function per external data source.
@@ -207,7 +207,7 @@ passing. Plus manual scenario testing against authorized or demo targets.
 
 ## Key facts sheet (for quick reference on slides)
 
-- **Stack:** React 18, TypeScript, Vite 6, Tailwind CSS 4, Cytoscape.js,
+- **Stack:** React 18, TypeScript, Vite 8, Tailwind CSS 4, Cytoscape.js,
   Node.js, Express.
 - **External sources:** crt.sh, CertSpotter, Sonar, BufferOver, HackerTarget,
   Google DoH, Shodan, Censys, GreyHatWarfare.

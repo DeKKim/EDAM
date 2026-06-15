@@ -10,7 +10,7 @@ GitHub and in most Markdown viewers.
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | Frontend UI | React 18 + TypeScript | Views, state, workflow orchestration |
-| Build / dev | Vite 6 | Dev server, HMR, production bundle |
+| Build / dev | Vite 8 | Dev server, HMR, production bundle |
 | Styling | Tailwind CSS 4 | Utility-first styling |
 | Visualization | Cytoscape.js | Interactive node-link asset graph |
 | Icons | lucide-react | UI iconography |
