@@ -4,6 +4,34 @@
 
 EDAM is a bachelor project focused on external attack surface mapping. It is a full-stack web application that discovers internet-facing assets related to a target domain, enriches them with external intelligence, applies heuristic risk scoring, and presents the results through dashboards, tables, historical comparison, exports, and an interactive graph.
 
+## Quick Start
+
+On Windows, run the project from the repository root by double-clicking:
+
+```text
+start-edam.bat
+```
+
+The launcher checks that Node.js/npm are available, prints the installed versions, installs dependencies when `node_modules` is missing, repairs common Windows optional-dependency issues, and starts both the frontend and backend.
+
+Open the app at:
+
+- frontend: `http://localhost:5173`
+- backend health check: `http://localhost:8787/api/health`
+
+From Git Bash, WSL, Linux, or macOS, use:
+
+```bash
+./start-edam.sh
+```
+
+Manual startup is also supported:
+
+```bash
+npm install
+npm start
+```
+
 ## Abstract
 
 Organizations often expose more external infrastructure than they intentionally track. Public-facing domains, subdomains, IP addresses, services, and cloud storage assets can accumulate over time through infrastructure growth, misconfiguration, shadow IT, and legacy systems. This creates visibility gaps that directly affect attack surface management.
@@ -424,7 +452,6 @@ Possible future improvements include:
 ├── server/
 │   ├── presentation.mjs
 │   └── server.mjs
-├── start-presentation.bat
 ├── start-presentation.sh
 ├── start-edam.bat
 ├── start-edam.sh
@@ -469,66 +496,62 @@ Possible future improvements include:
 
 ## Setup and Running
 
-### Presentation Mode
+### Requirements
 
-Use this when you need to run EDAM on another computer without installing npm packages there.
+- Node.js 20+ recommended
+- npm 9+ recommended
 
-Prepare it once on your own computer:
+Check local tool versions with:
 
 ```bash
-npm install
-npm run build
+npm run version:check
 ```
 
-Then copy the project folder to a USB drive or the presentation computer. The copied folder must include:
+This prints the active Node.js, npm, Vite, and TypeScript versions used by the local environment.
 
-- `dist/`
-- `server/presentation.mjs`
-- `start-presentation.bat`
+### Start with the Windows launcher
 
-On the presentation computer, double-click:
-
-```text
-start-presentation.bat
-```
-
-This mode does not use `node_modules` and does not run `npm install`. It only needs Node.js to be installed on the presentation computer.
-
-Open:
-
-- app: `http://localhost:5173`
-- health check: `http://localhost:5173/api/health`
-
-### Easy Start
-
-On Windows, double-click:
+Double-click this file from the project root:
 
 ```text
 start-edam.bat
 ```
 
-From Git Bash, WSL, Linux, or macOS:
+The launcher:
+
+- checks that npm is available
+- prints Node.js and npm versions
+- installs dependencies when `node_modules` is missing
+- repairs common Windows optional dependency issues
+- starts both the Vite frontend and Express backend
+
+After it starts, open:
+
+- app: `http://localhost:5173`
+- backend health check: `http://localhost:8787/api/health`
+
+Keep the terminal window open while using the application.
+
+### Start from a shell
 
 ```bash
 ./start-edam.sh
 ```
 
-The launcher checks that `npm` is available, installs dependencies when `node_modules` is missing, and starts both the frontend and backend.
+This is the same workflow for Git Bash, WSL, Linux, and macOS.
 
-Open:
-
-- frontend: `http://localhost:5173`
-- backend health check: `http://localhost:8787/api/health`
-
-### Install Dependencies
+### Manual startup
 
 ```bash
 npm install
+npm start
 ```
 
-### Configure Environment Variables
+`npm start` runs the frontend and backend together through `npm run dev`.
 
-Create a `.env` file in the project root:
+### Optional API Keys
+
+Create a `.env` file in the project root when you want Shodan, Censys, or GreyHatWarfare enrichment:
 
 ```env
 VITE_SHODAN_API_KEY=
@@ -539,45 +562,58 @@ VITE_GREYHAT_API_KEY=
 
 If a key is missing, the related enrichment phase is skipped.
 
-### Start Development Mode
+### How to Use
 
-```bash
-npm start
-```
+1. Start EDAM and open `http://localhost:5173`.
+2. Enter a domain you are authorized to assess.
+3. Choose a scan mode:
+   - `Fast Demo` for quick passive mapping
+   - `Balanced` for the default workflow
+   - `Deep Review` for broader mapping and active port validation
+4. Enable or disable optional sources such as Shodan, Censys, GreyHatWarfare, and active port checking.
+5. Click `Start Scan` and follow the live progress log.
+6. Use `Dashboard` for summary metrics, `Asset Graph` for relationships, `Risk Table` for triage, `History` for comparison, and `Export` for CSV/JSON/Markdown output.
 
-This starts:
+### Quality Checks
 
-- frontend on `http://localhost:5173`
-- backend on `http://localhost:8787`
-
-`npm run dev` does the same thing and is kept for the usual Vite-style workflow.
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-### Preview Production Build
-
-```bash
-npm run preview
-```
-
-### Run Tests
+Run unit tests:
 
 ```bash
 npm test
 ```
 
-The pure logic in `src/engine/` (risk scoring, graph building, scan diffing, and
-export) is covered by unit tests under `test/`, run with
-Node.js's built-in test runner — no extra dependencies. Type-check the whole
-project with:
+Type-check the project:
 
 ```bash
 npx tsc --noEmit
 ```
+
+Build production assets:
+
+```bash
+npm run build
+```
+
+Run the full local verification sequence:
+
+```bash
+npm run verify
+```
+
+The pure logic in `src/engine/` (risk scoring, graph building, scan diffing, and export) is covered by unit tests under `test/`, run with Node.js's built-in test runner.
+
+### Optional Static Server
+
+For a built static copy, run:
+
+```bash
+npm run build
+npm run presentation
+```
+
+This serves the existing `dist/` build and the same local API endpoints at `http://localhost:5173`.
+
+Preview through Vite is also available with `npm run preview`.
 
 ## Troubleshooting
 
@@ -587,7 +623,7 @@ npx tsc --noEmit
 | "Shodan/Censys/GreyHatWarfare skipped" in the log | No API key configured. Add the key(s) to `.env` (see `.env.local.example`). All keys are optional. |
 | Active port check fails / "Backend unreachable" | The local backend isn't running. Use `npm start` (starts both), and confirm `http://localhost:8787/api/health` returns `{ "ok": true }`. |
 | HTTP probe shows `false` for sites that load in a browser | Probing uses `no-cors` HEAD requests and only confirms reachability; some hosts block it. This is expected and noted in the limitations. |
-| `npm run build` fails with a `@rollup/rollup-*` "Cannot find module" error | Platform-specific optional dependency mismatch (e.g. copying `node_modules` between OSes). Delete `node_modules` and `package-lock.json`, then `npm install` on the target machine. |
+| `npm run build` fails with an `@rolldown/binding-*` or native binding "Cannot find module" error | Platform-specific optional dependency mismatch (e.g. copying `node_modules` between OSes). Delete `node_modules` and `package-lock.json`, then `npm install` on the target machine. |
 | Presentation mode shows "Missing dist/index.html" | You must run `npm run build` once before using presentation mode. |
 
 ## Local Backend API

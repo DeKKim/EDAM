@@ -15,6 +15,11 @@ if [ ! -d node_modules ]; then
 fi
 
 echo "Starting EDAM..."
+echo
+echo "Version check:"
+node --version
+npm --version
+echo
 echo "Frontend: http://localhost:5173"
 echo "Backend:  http://localhost:8787"
 npm run dev

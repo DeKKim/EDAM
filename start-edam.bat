@@ -20,8 +20,8 @@ if not exist node_modules (
   )
 )
 
-if not exist "node_modules\@rollup\rollup-win32-x64-msvc" (
-  echo Repairing Windows dependencies...
+if not exist "node_modules\@rolldown\binding-win32-x64-msvc" if not exist "node_modules\@rolldown\binding-win32-arm64-msvc" (
+  echo Repairing Windows Vite dependencies...
   call npm install
   if errorlevel 1 (
     echo Dependency repair failed.
@@ -32,6 +32,11 @@ if not exist "node_modules\@rollup\rollup-win32-x64-msvc" (
 )
 
 echo Starting EDAM...
+echo.
+echo Version check:
+node --version
+npm --version
+echo.
 echo Frontend: http://localhost:5173
 echo Backend:  http://localhost:8787
 call npm run dev

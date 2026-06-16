@@ -11,7 +11,9 @@
     "presentation:build": "vite build",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "version:check": "node --version && npm --version && npx vite --version && npx tsc --version",
+    "verify": "npm run version:check && npm test && npx tsc --noEmit && npm run build"
   },
   "dependencies": {
     "clsx": "^2.1.1",
