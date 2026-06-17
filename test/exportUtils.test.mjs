@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exportCsv, exportJson, exportMarkdown } from '../src/engine/exportUtils.ts';
+import { exportCsv, exportJson, exportMarkdown, loadHistory } from '../src/engine/exportUtils.ts';
 
 const scan = {
   id: 's',
@@ -35,4 +35,26 @@ test('Markdown export includes the report title and a recommendation for the DB 
   assert.ok(md.includes('# External Asset Scan Report'));
   assert.ok(md.includes('x.com'));
   assert.match(md, /private network/i); // recommendation for the exposed database
+});
+
+test('history seeds the bundled scan only for fresh localStorage', () => {
+  let value = null;
+  globalThis.localStorage = {
+    getItem() {
+      return value;
+    },
+  };
+
+  try {
+    const seeded = loadHistory();
+    assert.equal(seeded.length, 1);
+    assert.equal(seeded[0].domain, 'scanme.nmap.org');
+    assert.equal(seeded[0].stats.totalAssets, 7);
+    assert.equal(seeded[0].stats.maxRisk, 9);
+
+    value = '[]';
+    assert.deepEqual(loadHistory(), []);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });

@@ -4,6 +4,7 @@
  */
 
 import type { Asset, ScanResult } from '../types';
+import { SAMPLE_SCAN_HISTORY } from '../data/sampleScans.ts';
 
 const HISTORY_KEY = 'edam_scan_history';
 const MAX_HISTORY = 15;
@@ -28,6 +29,7 @@ export function saveToHistory(scan: ScanResult): void {
 export function loadHistory(): ScanResult[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return SAMPLE_SCAN_HISTORY;
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
