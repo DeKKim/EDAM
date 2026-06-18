@@ -16,8 +16,8 @@ The launcher checks that Node.js/npm are available, prints the installed version
 
 Open the app at:
 
-- frontend: `http://localhost:5173`
-- backend health check: `http://localhost:8787/api/health`
+- frontend: `http://127.0.0.1:5173`
+- backend health check: `http://127.0.0.1:8787/api/health`
 
 From Git Bash, WSL, Linux, or macOS, use:
 
@@ -130,7 +130,7 @@ The backend exists specifically to perform active TCP port checks that are not p
 
 ### Development Proxy
 
-The Vite development server proxies `/api` requests to the Express backend at `http://localhost:8787`.
+The Vite development server proxies `/api` requests to the Express backend at `http://127.0.0.1:8787`. Both development servers bind to localhost by default.
 
 ## Tools and APIs Used
 
@@ -471,12 +471,12 @@ Possible future improvements include:
 │   └── main.tsx
 ├── test/
 │   ├── changeDetection.test.mjs
+│   ├── connectors.test.mjs
 │   ├── exportUtils.test.mjs
 │   ├── graphBuilder.test.mjs
 │   └── riskEngine.test.mjs
 ├── docs/
 │   ├── ARCHITECTURE.md
-│   ├── PRESENTATION_BRIEF.md
 │   └── USER_GUIDE.md
 ├── test-api-connectors.mjs
 ├── CONTRIBUTING.md
@@ -489,7 +489,6 @@ Possible future improvements include:
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — component, sequence, and deployment diagrams; data model; design decisions
-- [Presentation Brief](docs/PRESENTATION_BRIEF.md) — slide-ready talking points and demo structure
 - [User Guide](docs/USER_GUIDE.md) — step-by-step walkthrough of every view
 - [Contributing](CONTRIBUTING.md) — setup, project layout, conventions, and checks
 - [License](LICENSE) — MIT
@@ -527,8 +526,8 @@ The launcher:
 
 After it starts, open:
 
-- app: `http://localhost:5173`
-- backend health check: `http://localhost:8787/api/health`
+- app: `http://127.0.0.1:5173`
+- backend health check: `http://127.0.0.1:8787/api/health`
 
 Keep the terminal window open while using the application.
 
@@ -564,7 +563,7 @@ If a key is missing, the related enrichment phase is skipped.
 
 ### How to Use
 
-1. Start EDAM and open `http://localhost:5173`.
+1. Start EDAM and open `http://127.0.0.1:5173`.
 2. Enter a domain you are authorized to assess.
 3. Choose a scan mode:
    - `Fast Demo` for quick passive mapping
@@ -611,7 +610,7 @@ npm run build
 npm run presentation
 ```
 
-This serves the existing `dist/` build and the same local API endpoints at `http://localhost:5173`.
+This serves the existing `dist/` build and the same local API endpoints at `http://127.0.0.1:5173`.
 
 Preview through Vite is also available with `npm run preview`.
 
@@ -621,7 +620,7 @@ Preview through Vite is also available with `npm run preview`.
 |---------|----------------------|
 | Passive discovery returns few/no subdomains | Public OSINT sources or CORS proxies are rate-limited or temporarily down. Retry, or run a different target; sources fail soft and the scan still completes. |
 | "Shodan/Censys/GreyHatWarfare skipped" in the log | No API key configured. Add the key(s) to `.env` (see `.env.local.example`). All keys are optional. |
-| Active port check fails / "Backend unreachable" | The local backend isn't running. Use `npm start` (starts both), and confirm `http://localhost:8787/api/health` returns `{ "ok": true }`. |
+| Active port check fails / "Backend unreachable" | The local backend isn't running. Use `npm start` (starts both), and confirm `http://127.0.0.1:8787/api/health` returns `{ "ok": true }`. |
 | HTTP probe shows `false` for sites that load in a browser | Probing uses `no-cors` HEAD requests and only confirms reachability; some hosts block it. This is expected and noted in the limitations. |
 | `npm run build` fails with an `@rolldown/binding-*` or native binding "Cannot find module" error | Platform-specific optional dependency mismatch (e.g. copying `node_modules` between OSes). Delete `node_modules` and `package-lock.json`, then `npm install` on the target machine. |
 | Presentation mode shows "Missing dist/index.html" | You must run `npm run build` once before using presentation mode. |

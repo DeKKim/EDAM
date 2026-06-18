@@ -124,7 +124,7 @@ Type definitions live in [`src/types/index.ts`](../src/types/index.ts).
 
 ```mermaid
 graph LR
-  Dev[Developer] -->|http://localhost:5173| Vite[Vite dev server]
+  Dev[Developer] -->|http://127.0.0.1:5173| Vite[Vite dev server]
   Vite -->|/api proxy| Express[Express backend :8787]
   Vite -->|HMR| Browser
 ```
@@ -136,7 +136,7 @@ Express backend on port 8787 (configured in `vite.config.ts`).
 
 ```mermaid
 graph LR
-  User[Presenter] -->|http://localhost:5173| Pres[presentation.mjs\nzero-dependency Node server]
+  User[Presenter] -->|http://127.0.0.1:5173| Pres[presentation.mjs\nzero-dependency Node server]
   Pres -->|serves| Dist[dist/ static build]
   Pres -->|/api/port-scan, /api/health| Net[net.Socket]
 ```

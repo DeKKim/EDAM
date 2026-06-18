@@ -49,6 +49,6 @@ echo "Version check:"
 node --version
 npm --version
 echo
-echo "Frontend: http://localhost:5173"
-echo "Backend:  http://localhost:8787"
+echo "Frontend: http://127.0.0.1:5173"
+echo "Backend:  http://127.0.0.1:8787"
 npm run dev

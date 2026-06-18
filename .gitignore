@@ -21,6 +21,7 @@ yarn-error.log*
 
 # Project-specific
 .codex
+docs/*.docx
 diag.mjs
 diag-google.mjs
 test-scan.mjs

@@ -10,7 +10,7 @@ A step-by-step guide to running a scan and interpreting the results.
 
 ## 1. Start a scan
 
-1. Open the app (`http://localhost:5173`).
+1. Open the app (`http://127.0.0.1:5173`).
 2. In **New Scan**, enter a target domain (e.g. `example.com`).
 3. Choose a **scan mode**:
    - **Fast Demo** — quick passive map (no Shodan), good for a first look or live demo.

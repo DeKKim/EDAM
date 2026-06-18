@@ -50,8 +50,8 @@ echo Version check:
 node --version
 call npm --version
 echo.
-echo Frontend: http://localhost:5173
-echo Backend:  http://localhost:8787
+echo Frontend: http://127.0.0.1:5173
+echo Backend:  http://127.0.0.1:8787
 call npm run dev
 set "EXIT_CODE=%ERRORLEVEL%"
 if not "%EXIT_CODE%"=="0" (

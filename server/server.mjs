@@ -3,10 +3,19 @@ import cors from 'cors';
 import net from 'net';
 
 const app = express();
-app.use(cors());
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
+app.use(cors({
+  origin(origin, callback) {
+    callback(null, !origin || allowedOrigins.has(origin));
+  },
+}));
 app.use(express.json({ limit: '1mb' }));
 
 const PORT = Number(process.env.PORT || 8787);
+const HOST = process.env.HOST || '127.0.0.1';
 
 function isValidIp(ip) {
   // Minimal validation: accept IPv4 or IPv6 literal.
@@ -135,8 +144,7 @@ app.post('/api/port-scan', async (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   // eslint-disable-next-line no-console
-  console.log(`[edam] port-scan backend listening on http://localhost:${PORT}`);
+  console.log(`[edam] port-scan backend listening on http://${HOST}:${PORT}`);
 });
-

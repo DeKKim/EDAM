@@ -8,6 +8,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const distRoot = resolve(projectRoot, 'dist');
 const PORT = Number(process.env.PORT || 5173);
+const HOST = process.env.HOST || '127.0.0.1';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -219,6 +220,6 @@ const server = createServer((req, res) => {
   sendJson(res, 405, { error: 'Method not allowed' });
 });
 
-server.listen(PORT, () => {
-  console.log(`[edam] presentation server running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`[edam] presentation server running at http://${HOST}:${PORT}`);
 });

@@ -60,6 +60,12 @@ function normalizeHostname(raw: string): string | null {
   return n;
 }
 
+export function hostnameBelongsToDomain(hostname: string, domain: string): boolean {
+  const host = normalizeHostname(hostname);
+  const base = normalizeHostname(domain);
+  return Boolean(host && base && (host === base || host.endsWith(`.${base}`)));
+}
+
 /* ── 1. Certificate Transparency (crt.sh) ── */
 
 interface CrtEntry {
@@ -76,7 +82,7 @@ export async function discoverSubdomainsCrtSh(domain: string): Promise<string[]>
     const names = e.name_value.split('\n');
     for (const raw of names) {
       const n = normalizeHostname(raw);
-      if (n && n.endsWith(domain)) subs.add(n);
+      if (n && hostnameBelongsToDomain(n, domain)) subs.add(n);
     }
   }
   return Array.from(subs);
@@ -96,7 +102,7 @@ export async function discoverSubdomainsHackerTarget(domain: string): Promise<st
     const subs = new Set<string>();
     for (const line of text.split('\n')) {
       const host = normalizeHostname(line.split(',')[0] || '');
-      if (host && host.endsWith(domain)) subs.add(host);
+      if (host && hostnameBelongsToDomain(host, domain)) subs.add(host);
     }
     return Array.from(subs);
   } catch {
@@ -122,7 +128,7 @@ export async function discoverSubdomainsCertSpotter(domain: string): Promise<str
     for (const iss of issuances) {
       for (const raw of iss.dns_names || []) {
         const n = normalizeHostname(raw);
-        if (n && n.endsWith(domain)) subs.add(n);
+        if (n && hostnameBelongsToDomain(n, domain)) subs.add(n);
       }
     }
     return Array.from(subs);
@@ -140,7 +146,7 @@ export async function discoverSubdomainsSonar(domain: string): Promise<string[]>
     const subs = new Set<string>();
     for (const raw of subsRaw || []) {
       const n = normalizeHostname(raw);
-      if (n && n.endsWith(domain)) subs.add(n);
+      if (n && hostnameBelongsToDomain(n, domain)) subs.add(n);
     }
     return Array.from(subs);
   } catch {
@@ -164,12 +170,12 @@ export async function discoverSubdomainsBufferOver(domain: string): Promise<stri
     const pullHost = (row: string) => normalizeHostname(row.split(',')[0] || '');
     for (const row of data.FDNS_A || []) {
       const host = pullHost(row);
-      if (host && host.endsWith(domain)) subs.add(host);
+      if (host && hostnameBelongsToDomain(host, domain)) subs.add(host);
     }
     for (const row of data.RDNS || []) {
       // RDNS entries often look like "1.2.3.4,hostname"
       const host = normalizeHostname(row.split(',')[1] || '');
-      if (host && host.endsWith(domain)) subs.add(host);
+      if (host && hostnameBelongsToDomain(host, domain)) subs.add(host);
     }
 
     return Array.from(subs);
@@ -339,7 +345,7 @@ export async function discoverSubdomainsCensys(
     for (const hit of data.result?.hits || []) {
       for (const raw of hit.names || []) {
         const n = normalizeHostname(raw);
-        if (n && n.endsWith(domain)) subs.add(n);
+        if (n && hostnameBelongsToDomain(n, domain)) subs.add(n);
       }
     }
     return Array.from(subs);

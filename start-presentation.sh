@@ -20,5 +20,5 @@ if [ ! -f dist/index.html ]; then
 fi
 
 echo "Starting EDAM presentation mode..."
-echo "Open: http://localhost:5173"
+echo "Open: http://127.0.0.1:5173"
 node server/presentation.mjs
